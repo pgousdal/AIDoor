@@ -1,0 +1,12 @@
+[general]
+log_level = "INFO"
+log_file = ""
+ansi = true
+utf8 = true
+pause_on_exit = false
+charset = "unicode"
+
+[terminal]
+width = 80
+height = 24
+more_prompt = true
