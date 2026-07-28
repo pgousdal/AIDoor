@@ -45,6 +45,9 @@ class Terminal(ABC):
     @abstractmethod
     def close(self) -> None: ...
 
+    @abstractmethod
+    def poll_key(self, timeout: float = 0) -> str | None: ...
+
 
 class StdinStdoutTerminal(Terminal):
     def __init__(
@@ -152,6 +155,27 @@ class StdinStdoutTerminal(Terminal):
     def height(self) -> int:
         return self._height
 
+    def poll_key(self, timeout: float = 0) -> str | None:
+        was_raw = self._raw_mode
+        if not was_raw:
+            self._enter_raw_mode()
+        try:
+            import select
+
+            r, _, _ = select.select([sys.stdin], [], [], timeout)
+            if r:
+                data = os.read(sys.stdin.fileno(), 1)
+                if not data:
+                    return None
+                ch = data.decode("utf-8", errors="replace")
+                if ch == "\x03":
+                    raise KeyboardInterrupt()
+                return ch
+            return None
+        finally:
+            if not was_raw and self._raw_mode:
+                self._restore_terminal()
+
     def close(self) -> None:
         self._restore_terminal()
         if self._enable_ansi:
@@ -236,6 +260,15 @@ class FakeTerminal(Terminal):
     @property
     def height(self) -> int:
         return self._height
+
+    def poll_key(self, timeout: float = 0) -> str | None:
+        if self._key_index < len(self._keys):
+            ch = self._keys[self._key_index]
+            self._key_index += 1
+            if ch == "\x03":
+                raise KeyboardInterrupt()
+            return ch
+        return None
 
     def close(self) -> None:
         self._closed = True

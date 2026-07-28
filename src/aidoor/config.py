@@ -52,9 +52,30 @@ class TerminalConfig:
 
 
 @dataclasses.dataclass
+class OllamaConfig:
+    enabled: bool = True
+    host: str = "http://localhost:11434"
+    model: str = "llama3.1"
+    timeout: int = 120
+
+    def __post_init__(self) -> None:
+        if self.timeout < 1 or self.timeout > 600:
+            raise ConfigurationError(
+                f"Invalid ollama timeout: {self.timeout}. Must be between 1 and 600."
+            )
+        if not self.host.startswith("http://") and not self.host.startswith("https://"):
+            raise ConfigurationError(
+                f"Invalid ollama host: {self.host!r}. Must start with http:// or https://."
+            )
+        if not self.model.strip():
+            raise ConfigurationError("ollama model must not be empty")
+
+
+@dataclasses.dataclass
 class AppConfig:
     general: GeneralConfig = dataclasses.field(default_factory=GeneralConfig)
     terminal: TerminalConfig = dataclasses.field(default_factory=TerminalConfig)
+    ollama: OllamaConfig = dataclasses.field(default_factory=OllamaConfig)
 
 
 def parse_config(config_path: str | None) -> AppConfig:
@@ -73,10 +94,12 @@ def parse_config(config_path: str | None) -> AppConfig:
 
     general_raw = _filter_known(data.get("general", {}), GeneralConfig)
     terminal_raw = _filter_known(data.get("terminal", {}), TerminalConfig)
+    ollama_raw = _filter_known(data.get("ollama", {}), OllamaConfig)
 
     return AppConfig(
         general=GeneralConfig(**general_raw),
         terminal=TerminalConfig(**terminal_raw),
+        ollama=OllamaConfig(**ollama_raw),
     )
 
 
