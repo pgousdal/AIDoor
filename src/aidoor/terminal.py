@@ -168,8 +168,6 @@ class StdinStdoutTerminal(Terminal):
                 if not data:
                     return None
                 ch = data.decode("utf-8", errors="replace")
-                if ch == "\x03":
-                    raise KeyboardInterrupt()
                 return ch
             return None
         finally:
@@ -264,10 +262,10 @@ class FakeTerminal(Terminal):
     def poll_key(self, timeout: float = 0) -> str | None:
         if self._key_index < len(self._keys):
             ch = self._keys[self._key_index]
-            self._key_index += 1
-            if ch == "\x03":
-                raise KeyboardInterrupt()
-            return ch
+            if ch in ("\x1b", "\x03"):
+                self._key_index += 1
+                return ch
+            return None
         return None
 
     def close(self) -> None:

@@ -37,7 +37,7 @@ class OllamaClient:
             if exc.code == 404:
                 return []
             raise OllamaConnectionError(f"Ollama returned HTTP {exc.code}") from exc
-        except (TimeoutError, urllib.error.URLError) as exc:
+        except (TimeoutError, urllib.error.URLError, ConnectionError) as exc:
             raise OllamaConnectionError(
                 f"Cannot connect to Ollama at {self._host}"
             ) from exc
@@ -83,7 +83,7 @@ class OllamaClient:
             except json.JSONDecodeError:
                 err_msg = body_raw
             raise OllamaConnectionError(f"Ollama returned HTTP {exc.code}: {err_msg}") from exc
-        except (TimeoutError, urllib.error.URLError) as exc:
+        except (TimeoutError, urllib.error.URLError, ConnectionError) as exc:
             raise OllamaConnectionError(
                 f"Cannot connect to Ollama at {self._host}"
             ) from exc

@@ -12,7 +12,7 @@ from aidoor.terminal import FakeTerminal
 
 
 class TestSplash:
-    def test_shows_aidoor_in_output(self) -> None:
+    def test_shows_app_name_in_output(self) -> None:
         session = create_local_session()
         term = FakeTerminal(keys=[" "])
         show_splash(term, session)
@@ -20,29 +20,23 @@ class TestSplash:
         assert "AIDoor" in output
         assert session.display_name in output
 
-    def test_local_mode_indicated(self) -> None:
-        session = create_local_session()
+    def test_shows_node_number(self) -> None:
+        session = create_local_session(node_number=5)
         term = FakeTerminal(keys=[" "])
         show_splash(term, session)
-        assert "LOCAL TEST" in term.output
-        assert "LOCAL TEST MODE" not in term.output
-
-    def test_missing_ansi_asset_uses_fallback(self) -> None:
-        session = create_local_session()
-        term = FakeTerminal(keys=[" "])
-        show_splash(term, session, ansi_dir="/nonexistent")
-        assert "AIDoor" in term.output
+        assert "5" in term.output
 
 
 class TestMainMenu:
-    def test_contains_all_options(self) -> None:
+    def test_contains_chat_option(self) -> None:
         session = create_local_session()
         term = FakeTerminal(keys=["q"])
         choice = show_main_menu(term, session)
         output = term.output
+        assert "Chat" in output
         assert "About" in output
-        assert "Session" in output
-        assert "Return" in output
+        assert "Session information" in output
+        assert "Return to BBS" in output
         assert choice == "q"
 
     def test_accepts_lowercase_q(self) -> None:
@@ -65,33 +59,34 @@ class TestMainMenu:
         term = FakeTerminal(keys=["2"])
         assert show_main_menu(term, session) == "2"
 
+    def test_accepts_3(self) -> None:
+        session = create_local_session()
+        term = FakeTerminal(keys=["3"])
+        assert show_main_menu(term, session) == "3"
+
     def test_invalid_choice_does_not_exit(self) -> None:
         session = create_local_session()
-        term = FakeTerminal(keys=["x", "q", "q"])
+        term = FakeTerminal(keys=["x", " ", "q"])
         result = show_main_menu(term, session)
         assert result == "q"
         assert "Invalid" in term.output
 
 
 class TestAbout:
-    def test_shows_aidoor_and_version(self) -> None:
+    def test_shows_app_name_and_version(self) -> None:
         session = create_local_session()
         term = FakeTerminal(keys=[" "])
         show_about(term, session)
         output = term.output
         assert "AIDoor" in output
-        assert "M0" in output
+        assert "0.2.0" in output
+        assert "M1" in output
         assert "MIT" in output
-
-    def test_shows_no_ai_provider_message(self) -> None:
-        session = create_local_session()
-        term = FakeTerminal(keys=[" "])
-        show_about(term, session)
-        assert "AI provider" in term.output
+        assert "Ollama" in output
 
 
 class TestSessionInfo:
-    def test_shows_normalized_session_data(self) -> None:
+    def test_shows_session_data(self) -> None:
         session = create_local_session(
             alias="TestUser",
             real_name="Test Real",
@@ -101,16 +96,16 @@ class TestSessionInfo:
         show_session_info(term, session)
         output = term.output
         assert "TestUser" in output
-        assert "Test Real" in output
         assert "3" in output
+        assert "Local" in output
 
-    def test_local_mode_yes(self) -> None:
+    def test_shows_local_mode(self) -> None:
         session = create_local_session()
         term = FakeTerminal(keys=[" "])
         show_session_info(term, session)
-        assert "Yes" in term.output
+        assert "Local" in term.output
 
-    def test_local_mode_no(self) -> None:
+    def test_door32_mode(self) -> None:
         from aidoor.door32 import Door32Data
         from aidoor.session import create_session_from_door32
 
@@ -140,7 +135,22 @@ class TestGoodbye:
         show_goodbye(term)
         assert "AIDoor" in term.output or "BBS" in term.output
 
-    def test_missing_ansi_asset_uses_fallback(self) -> None:
+    def test_shows_return_message(self) -> None:
         term = FakeTerminal(keys=[])
-        show_goodbye(term, ansi_dir="/nonexistent")
-        assert "AIDoor" in term.output or "BBS" in term.output
+        show_goodbye(term)
+        assert "Returning to BBS" in term.output
+
+
+class TestTerminalSizeCheck:
+    def test_too_small_splash(self) -> None:
+        session = create_local_session()
+        term = FakeTerminal(keys=[" "], width=30, height=10)
+        show_splash(term, session)
+        assert "too small" in term.output
+
+    def test_too_small_menu(self) -> None:
+        session = create_local_session()
+        term = FakeTerminal(keys=[" "], width=30, height=10)
+        result = show_main_menu(term, session)
+        assert result == "q"
+        assert "too small" in term.output

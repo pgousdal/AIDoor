@@ -43,3 +43,7 @@ class TestCliArgumentParsing:
             assert result == 1
         finally:
             os.unlink(path)
+
+    def test_config_not_found_returns_1(self) -> None:
+        result = main(["--local", "--config", "/nonexistent/config.toml"])
+        assert result == 1

@@ -1,0 +1,10 @@
+[general]
+theme = "default"
+log_file = "/var/log/ansiassistant.log"
+show_startup_banner = true
+charset = "unicode"
+
+[terminal]
+width = 80
+height = 24
+more_prompt = true

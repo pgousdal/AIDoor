@@ -6,6 +6,8 @@ from aidoor.ansi import UNICODE_BOX, BoxChars, resolve_charset
 from aidoor.config import AppConfig
 from aidoor.door32 import parse_door32_file
 from aidoor.errors import AIDoorError
+from aidoor.ollama.chat_ui import chat_loop
+from aidoor.ollama.client import OllamaClient
 from aidoor.screens import (
     show_about,
     show_goodbye,
@@ -68,7 +70,7 @@ def run_app(
         logging.getLogger("aidoor").setLevel(logging.WARNING)
 
     try:
-        _run_interactive(term, session, charset)
+        _run_interactive(term, session, charset, config)
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
         term.writeln("\r\n\r\nInterrupted by user.")
@@ -88,18 +90,36 @@ def run_app(
     return 0
 
 
-def _run_interactive(term: Terminal, session: Session, charset: BoxChars) -> None:
+def _run_interactive(
+    term: Terminal,
+    bbs_session: Session,
+    charset: BoxChars,
+    config: AppConfig,
+) -> None:
     ansi_dir: str | None = None
 
-    show_splash(term, session, ansi_dir, charset)
+    show_splash(term, bbs_session, ansi_dir, charset)
+
+    if config and config.ollama.enabled:
+        ollama_client = OllamaClient(
+            host=config.ollama.host,
+            timeout=config.ollama.timeout,
+        )
+    else:
+        ollama_client = None
 
     while True:
-        choice = show_main_menu(term, session, charset)
+        choice = show_main_menu(term, bbs_session, charset)
 
         if choice == "1":
-            show_about(term, session, charset)
+            if ollama_client is not None:
+                chat_loop(term, ollama_client, config.ollama.model)
+            else:
+                show_about(term, bbs_session, charset)
         elif choice == "2":
-            show_session_info(term, session, charset)
+            show_about(term, bbs_session, charset)
+        elif choice == "3":
+            show_session_info(term, bbs_session, charset)
         elif choice == "q":
             break
 

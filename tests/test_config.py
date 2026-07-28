@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from aidoor.config import AppConfig, GeneralConfig, TerminalConfig, parse_config
+from aidoor.config import AppConfig, GeneralConfig, OllamaConfig, TerminalConfig, parse_config
 from aidoor.errors import ConfigurationError
 
 
@@ -15,8 +15,6 @@ class TestDefaultConfig:
         assert config.general.log_level == "INFO"
         assert config.general.log_file == ""
         assert config.general.ansi
-        assert config.general.utf8
-        assert not config.general.pause_on_exit
         assert config.terminal.width == 80
         assert config.terminal.height == 24
         assert config.terminal.more_prompt
@@ -39,6 +37,10 @@ class TestGeneralConfig:
     def test_case_insensitive_log_level(self) -> None:
         gc = GeneralConfig(log_level="info")
         assert gc.log_level == "info"
+
+    def test_invalid_charset(self) -> None:
+        with pytest.raises(ConfigurationError, match="Invalid charset"):
+            GeneralConfig(charset="utf8")
 
 
 class TestTerminalConfig:
@@ -64,20 +66,44 @@ class TestTerminalConfig:
             TerminalConfig(width=80, height=300)
 
 
+class TestOllamaConfig:
+    def test_default_values(self) -> None:
+        oc = OllamaConfig()
+        assert oc.enabled
+        assert oc.host == "http://localhost:11434"
+        assert oc.model == "llama3.1"
+        assert oc.timeout == 120
+
+    def test_invalid_timeout(self) -> None:
+        with pytest.raises(ConfigurationError, match="timeout"):
+            OllamaConfig(timeout=0)
+
+    def test_invalid_host(self) -> None:
+        with pytest.raises(ConfigurationError, match="host"):
+            OllamaConfig(host="localhost:11434")
+
+    def test_empty_model(self) -> None:
+        with pytest.raises(ConfigurationError, match="model"):
+            OllamaConfig(model="")
+
+
 class TestParseConfig:
     def test_valid_toml(self) -> None:
         content = """
 [general]
 log_level = "DEBUG"
-log_file = "/tmp/test.log"
+log_file = "/tmp/aidoor.log"
 ansi = false
-utf8 = false
-pause_on_exit = true
 
 [terminal]
-width = 120
+width = 100
 height = 30
 more_prompt = false
+
+[ollama]
+host = "http://ollama:11434"
+model = "mistral"
+timeout = 60
 """
         fd, path = tempfile.mkstemp(suffix=".toml")
         try:
@@ -85,13 +111,14 @@ more_prompt = false
             os.close(fd)
             config = parse_config(path)
             assert config.general.log_level == "DEBUG"
-            assert config.general.log_file == "/tmp/test.log"
+            assert config.general.log_file == "/tmp/aidoor.log"
             assert not config.general.ansi
-            assert not config.general.utf8
-            assert config.general.pause_on_exit
-            assert config.terminal.width == 120
+            assert config.terminal.width == 100
             assert config.terminal.height == 30
             assert not config.terminal.more_prompt
+            assert config.ollama.host == "http://ollama:11434"
+            assert config.ollama.model == "mistral"
+            assert config.ollama.timeout == 60
         finally:
             os.unlink(path)
 
@@ -119,6 +146,12 @@ unknown_key = "value"
 [terminal]
 width = 80
 height = 24
+
+[ollama]
+enabled = true
+host = "http://localhost:11434"
+model = "llama3.1"
+timeout = 120
 
 [unknown_section]
 foo = "bar"

@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import logging
+
+from aidoor.ollama.chat_session import ChatSession
 from aidoor.ollama.client import OllamaClient
-from aidoor.ollama.errors import OllamaConnectionError, OllamaError
+from aidoor.ollama.errors import (
+    OllamaConnectionError,
+    OllamaError,
+    OllamaInvalidResponseError,
+    OllamaModelNotFoundError,
+    OllamaTimeoutError,
+)
 from aidoor.ollama.models import ModelInfo, ModelSelectionResult
+from aidoor.ollama.stream_renderer import StreamRenderer
 from aidoor.terminal import Terminal
+
+logger = logging.getLogger("aidoor")
 
 
 def _sort_and_dedupe_models(
@@ -89,6 +101,35 @@ def _show_header(term: Terminal, model_name: str) -> None:
     term.flush()
 
 
+def _show_commands(term: Terminal) -> None:
+    help_text = (
+        "\r\n  Available commands:\r\n"
+        "  /help          Show this help\r\n"
+        "  /clear         Clear conversation\r\n"
+        "  /model         Show current model\r\n"
+        "  /model list    List installed models\r\n"
+        "  /model select  Change model\r\n"
+        "  /quit          Return to main menu\r\n"
+    )
+    term.write(help_text)
+    term.flush()
+
+
+def _confirm(term: Terminal, prompt: str) -> bool:
+    term.write(f"\r\n  {prompt} (Y/N) ")
+    term.flush()
+    while True:
+        key = term.read_key().lower()
+        if key == "y":
+            term.write("\r\n")
+            term.flush()
+            return True
+        if key == "n":
+            term.write("\r\n")
+            term.flush()
+            return False
+
+
 def chat_loop(
     term: Terminal,
     client: OllamaClient,
@@ -125,7 +166,133 @@ def chat_loop(
         return
 
     assert result.model is not None
-    _show_header(term, result.model)
+    selected_model = result.model
+    session = ChatSession(model=selected_model)
+    _show_header(term, selected_model)
     term.writeln()
-    term.writeln("  You> ")
-    term.flush()
+
+    while True:
+        term.write("  You> ")
+        term.flush()
+
+        try:
+            line = term.read_line()
+        except EOFError:
+            return
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line.startswith("/"):
+            cmd = line.lower().split()
+            command = cmd[0] if cmd else "/help"
+
+            if command == "/quit":
+                return
+
+            if command == "/help":
+                _show_commands(term)
+                continue
+
+            if command == "/clear":
+                if session.messages and not _confirm(term, "Clear conversation?"):
+                    continue
+                session.clear()
+                term.write("\r\n  Conversation cleared.\r\n")
+                term.flush()
+                continue
+
+            if command == "/model":
+                if len(cmd) == 1:
+                    term.write(
+                        f"\r\n  Current model: {session.model}\r\n"
+                    )
+                    term.flush()
+                    continue
+                sub = cmd[1]
+                if sub == "list":
+                    for m in models:
+                        label = m.name
+                        if m.name.lower() == session.model.lower():
+                            label += "   (active)"
+                        term.write(f"  {label}\r\n")
+                    term.flush()
+                    continue
+                if sub == "select":
+                    if session.messages:
+                        if not _confirm(
+                            term, "Changing model will clear the conversation. Continue?"
+                        ):
+                            continue
+                    if len(sorted_models) == 1:
+                        new_model = sorted_models[0].name
+                    else:
+                        sel = show_model_selection(term, sorted_models, session.model)
+                        if sel.cancelled:
+                            continue
+                        assert sel.model is not None
+                        new_model = sel.model
+                    if new_model != session.model:
+                        session.clear()
+                        session.model = new_model
+                        term.write(f"\r\n  Switched to model: {new_model}\r\n")
+                        term.flush()
+                    continue
+
+                term.write("\r\n  Usage: /model, /model list, /model select\r\n")
+                term.flush()
+                continue
+
+            term.write(
+                f"\r\n  Unknown command: {cmd[0]}\r\n"
+                "  Type /help for available commands.\r\n"
+            )
+            term.flush()
+            continue
+
+        session.add_user_message(line)
+
+        term.write("\r\n  AI> ")
+        term.flush()
+
+        try:
+            stream = client.chat_stream(
+                model=session.model,
+                messages=session.to_api_format(),
+            )
+            renderer = StreamRenderer(term, width=term.width)
+            response = renderer.render(stream)
+            session.add_assistant_message(
+                _strip_cancel_suffix(response)
+            )
+        except OllamaModelNotFoundError:
+            term.write(
+                f"\r\n  Model '{session.model}' not found on server.\r\n"
+            )
+            term.flush()
+            session._messages.pop()
+            continue
+        except (OllamaConnectionError, OllamaTimeoutError) as exc:
+            term.write(f"\r\n  Connection error: {exc}\r\n")
+            term.flush()
+            session._messages.pop()
+            continue
+        except OllamaInvalidResponseError:
+            term.write(
+                "\r\n  Invalid response from Ollama.\r\n"
+            )
+            term.flush()
+            session._messages.pop()
+            continue
+
+        term.writeln()
+        term.flush()
+
+
+def _strip_cancel_suffix(text: str) -> str:
+    marker = "[Generation cancelled]"
+    if text.endswith(marker):
+        return text[: -len(marker)]
+    return text

@@ -86,7 +86,7 @@ def show_splash(
     mode_label = "LOCAL TEST" if session.local_mode else "NORMAL"
     _write_at(term, info_start + 4, 1, f"  Mode    : {mode_label}")
     _write_at(term, info_start + 5, 1, "")
-    _write_at(term, info_start + 6, 1, "  AI backend not available in M0 Door Skeleton.")
+    _write_at(term, info_start + 6, 1, "  Select Chat to start a local AI session.")
     term.write(CURSOR_SHOW)
     term.flush()
     term.pause("\r\n[Press any key to continue] ")
@@ -103,16 +103,17 @@ def show_main_menu(
 
     while True:
         bw = 38
-        bh = 9
+        bh = 10
 
         box_str, bounds = draw_box(1, 1, bw, bh, title=f"{__app_name__} Main Menu", charset=charset)
         parts = [
             CLEAR + HOME + CURSOR_HIDE + RESET,
             box_str,
             draw_box_separator(3, 1, bw, charset),
-            draw_box_content_line(5, 1, bw, "  1. About " + __app_name__, charset),
-            draw_box_content_line(6, 1, bw, "  2. Session information", charset),
-            draw_box_content_line(7, 1, bw, "  Q. Return to BBS", charset),
+            draw_box_content_line(5, 1, bw, "  1. Chat", charset),
+            draw_box_content_line(6, 1, bw, "  2. About " + __app_name__, charset),
+            draw_box_content_line(7, 1, bw, "  3. Session information", charset),
+            draw_box_content_line(8, 1, bw, "  Q. Return to BBS", charset),
         ]
         term.write("".join(parts))
 
@@ -124,7 +125,7 @@ def show_main_menu(
 
         if choice in ("\r", "\n"):
             continue
-        if choice in ("1", "2", "q"):
+        if choice in ("1", "2", "3", "q"):
             return choice
 
         _write_at(term, prompt_row + 1, 1, f"\r\n  Invalid choice: '{sanitize_text(choice)}'")
@@ -150,8 +151,8 @@ def show_about(
         draw_box_content_line(4, 1, bw, f"  Version: {__version__}", charset),
         draw_box_content_line(5, 1, bw, f"  {__milepost__}", charset),
         draw_box_content_line(6, 1, bw, "", charset),
-        draw_box_content_line(7, 1, bw, "  No AI provider loaded.", charset),
-        draw_box_content_line(8, 1, bw, "  Local LLM support planned for M1.", charset),
+        draw_box_content_line(7, 1, bw, "  Ollama: local AI chat available.", charset),
+        draw_box_content_line(8, 1, bw, "  Select Chat from the main menu.", charset),
         draw_box_content_line(9, 1, bw, "", charset),
         draw_box_content_line(10, 1, bw, f"  Project: {__app_name__}", charset),
         draw_box_content_line(11, 1, bw, "  License: MIT", charset),

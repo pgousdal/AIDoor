@@ -9,7 +9,9 @@ from aidoor.terminal import FakeTerminal
 
 
 def _config() -> AppConfig:
-    return AppConfig()
+    cfg = AppConfig()
+    cfg.ollama.enabled = False
+    return cfg
 
 
 class TestRunAppLocal:
@@ -21,13 +23,13 @@ class TestRunAppLocal:
         assert "Local test mode" in term.output
 
     def test_local_shows_menu_and_about(self) -> None:
-        term = FakeTerminal(keys=["1", " ", "q"])
+        term = FakeTerminal(keys=["2", " ", "q"])
         result = run_app(door32_path=None, local=True, config=_config(), term=term)
         assert result == 0
         assert "About" in term.output
 
     def test_local_shows_session_info(self) -> None:
-        term = FakeTerminal(keys=["2", " ", "q"])
+        term = FakeTerminal(keys=["3", " ", "q"])
         result = run_app(door32_path=None, local=True, config=_config(), term=term)
         assert result == 0
         assert "LocalUser" in term.output

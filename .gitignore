@@ -4,15 +4,7 @@ __pycache__/
 dist/
 build/
 .venv/
-.env
-.ruff_cache/
 .mypy_cache/
 .pytest_cache/
-*.egg
-.Python
-*.so
-instance/
-.webassets-cache/
-coverage/
-htmlcov/
-.tox/
+.ruff_cache/
+uv.lock

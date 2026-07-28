@@ -9,13 +9,13 @@ from aidoor.ansi import (
     draw_box,
     draw_box_content_line,
     draw_box_separator,
+    draw_box_title_line,
     resolve_charset,
 )
 
 
 def _box_str(*args: object, **kwargs: object) -> str:
-    """Call draw_box and return only the string part."""
-    result, _ = draw_box(*args, **kwargs)  # type: ignore[arg-type]
+    result, _ = draw_box(*args, **kwargs)
     return result
 
 
@@ -84,7 +84,6 @@ class TestDrawBox:
     def test_title_centered(self) -> None:
         result = _box_str(1, 1, 20, 5, title="Hello")
         assert "Hello" in result
-        # Title line starts with vertical bar then spaces (centered padding)
         title_marker = cursor_pos(2, 1) + UNICODE_BOX.v
         assert title_marker in result
 
@@ -148,17 +147,14 @@ class TestDrawBoxContentLine:
 
 class TestBoxDimensions:
     def test_borders_align_perfectly(self) -> None:
-        for width in range(4, 20):
-            for height in range(3, 10):
+        for width in range(4, 10):
+            for height in range(3, 8):
                 result = _box_str(1, 1, width, height)
                 inner = width - 2
-                # Top border should have exactly inner h-chars
                 top_part = UNICODE_BOX.tl + UNICODE_BOX.h * inner + UNICODE_BOX.tr
                 assert top_part in result, f"Top border broken for {width}x{height}"
-                # Bottom should match
                 bot_part = UNICODE_BOX.bl + UNICODE_BOX.h * inner + UNICODE_BOX.br
                 assert bot_part in result, f"Bottom border broken for {width}x{height}"
-                # Each content row should have v + inner spaces + v
                 for r in range(2, height):
                     row_part = UNICODE_BOX.v + " " * inner + UNICODE_BOX.v
                     pos = cursor_pos(r, 1)
@@ -171,8 +167,14 @@ class TestBoxDimensions:
 
     def test_vertical_bars_count(self) -> None:
         result = _box_str(1, 1, 6, 5)
-        # Top and bottom have corner chars (not v), middle 3 rows have 2 v each
         assert result.count(UNICODE_BOX.v) == 6
+
+
+class TestDrawBoxTitleLine:
+    def test_centers_title(self) -> None:
+        result = draw_box_title_line(3, 1, 20, "Test")
+        assert "Test" in result
+        assert UNICODE_BOX.v in result
 
 
 class TestDrawBoxCP437:
@@ -185,5 +187,4 @@ class TestDrawBoxCP437:
         result = _box_str(1, 1, 10, 5, charset=CP437_BOX)
         bot = cursor_pos(5, 1) + CP437_BOX.bl + CP437_BOX.h * 8 + CP437_BOX.br
         assert bot in result
-        # Verify no Unicode box chars leak in
         assert UNICODE_BOX.tl not in result

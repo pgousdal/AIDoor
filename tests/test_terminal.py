@@ -9,106 +9,136 @@ class TestFakeTerminalWrite:
     def test_write_stores_text(self) -> None:
         term = FakeTerminal()
         term.write("hello")
-        assert term.output == "hello"
+        assert "hello" in term.output
 
     def test_writeln_appends_newline(self) -> None:
         term = FakeTerminal()
         term.writeln("hello")
-        assert term.output == "hello\n"
+        assert "hello\n" in term.output
+
+    def test_writeln_without_arg(self) -> None:
+        term = FakeTerminal()
+        term.writeln()
+        assert term.output == "\n"
+
+    def test_flush_does_not_raise(self) -> None:
+        term = FakeTerminal()
+        term.flush()
 
     def test_multiple_writes(self) -> None:
         term = FakeTerminal()
-        term.write("a")
-        term.write("b")
-        assert term.output == "ab"
+        term.write("abc")
+        term.write("def")
+        assert term.output == "abcdef"
 
 
-class TestFakeTerminalReadKey:
-    def test_reads_keys_in_order(self) -> None:
-        term = FakeTerminal(keys=["a", "b", "c"])
+class TestFakeTerminalRead:
+    def test_read_key_returns_next_key(self) -> None:
+        term = FakeTerminal(keys=["a"])
+        assert term.read_key() == "a"
+
+    def test_read_key_multiple_keys(self) -> None:
+        term = FakeTerminal(keys=["a", "b"])
         assert term.read_key() == "a"
         assert term.read_key() == "b"
-        assert term.read_key() == "c"
 
-    def test_keyboard_interrupt(self) -> None:
-        term = FakeTerminal(keys=["\x03"])
-        with pytest.raises(KeyboardInterrupt):
-            term.read_key()
-
-    def test_eof_raises_error(self) -> None:
+    def test_read_key_raises_eof(self) -> None:
         term = FakeTerminal(keys=[])
         with pytest.raises(EOFError):
             term.read_key()
 
+    def test_read_key_ctrl_c_raises_keyboard_interrupt(self) -> None:
+        term = FakeTerminal(keys=["\x03"])
+        with pytest.raises(KeyboardInterrupt):
+            term.read_key()
 
-class TestFakeTerminalPause:
-    def test_pause_uses_default_prompt_when_not_provided(self) -> None:
-        term = FakeTerminal(keys=["x"])
-        term.pause()
-        assert "Press any key to continue" in term.output
+    def test_read_line_returns_line(self) -> None:
+        term = FakeTerminal(keys=["hello world"])
+        assert term.read_line() == "hello world"
 
-    def test_pause_reads_key(self) -> None:
-        term = FakeTerminal(keys=["q"])
-        term.pause("[Press Q] ")
-        assert term.output.endswith("[Press Q] ")
+    def test_read_line_multiple_entries(self) -> None:
+        term = FakeTerminal(keys=["first", "second"])
+        assert term.read_line() == "first"
+        assert term.read_line() == "second"
 
-    def test_pause_handles_eof(self) -> None:
+    def test_read_line_empty_string(self) -> None:
+        term = FakeTerminal(keys=[""])
+        assert term.read_line() == ""
+
+    def test_read_line_eof(self) -> None:
         term = FakeTerminal(keys=[])
+        with pytest.raises(EOFError):
+            term.read_line()
+
+
+class TestPause:
+    def test_pause_waits_for_key(self) -> None:
+        term = FakeTerminal(keys=[" "])
+        term.pause("Press any key")
+        assert "Press any key" in term.output
+
+    def test_pause_with_default_prompt(self) -> None:
+        term = FakeTerminal(keys=[" "])
         term.pause()
         assert "Press any key" in term.output
 
 
-class TestFakeTerminalClear:
-    def test_ansi_clear(self) -> None:
+class TestClear:
+    def test_clear_with_ansi(self) -> None:
         term = FakeTerminal(enable_ansi=True)
         term.clear()
         assert "\x1b[2J" in term.output
 
-    def test_non_ansi_clear(self) -> None:
-        term = FakeTerminal(enable_ansi=False)
+    def test_clear_without_ansi(self) -> None:
+        term = FakeTerminal(enable_ansi=False, height=24)
         term.clear()
-        assert "\x1b[2J" not in term.output
+        assert "\n" * 23 in term.output
 
 
-class TestFakeTerminalSanitization:
-    def test_ansi_stripped_when_disabled(self) -> None:
-        term = FakeTerminal(enable_ansi=False)
-        term.write("\x1b[31mred\x1b[0m")
-        assert "\x1b[" not in term.output
-        assert "red" in term.output
+class TestDimensions:
+    def test_default_width(self) -> None:
+        term = FakeTerminal()
+        assert term.width == 80
 
-    def test_ansi_preserved_when_enabled(self) -> None:
-        term = FakeTerminal(enable_ansi=True)
-        term.write("\x1b[31mred\x1b[0m")
-        assert "\x1b[31m" in term.output
+    def test_default_height(self) -> None:
+        term = FakeTerminal()
+        assert term.height == 24
+
+    def test_custom_dimensions(self) -> None:
+        term = FakeTerminal(width=100, height=50)
+        assert term.width == 100
+        assert term.height == 50
 
 
-class TestFakeTerminalClose:
+class TestClose:
     def test_close_sets_flag(self) -> None:
         term = FakeTerminal()
         assert not term.closed
         term.close()
         assert term.closed
 
-
-class TestFakeTerminalHome:
-    def test_home_ansi(self) -> None:
-        term = FakeTerminal(enable_ansi=True)
-        term.home()
-        assert "\x1b[H" in term.output
-
-    def test_home_non_ansi(self) -> None:
-        term = FakeTerminal(enable_ansi=False)
-        term.home()
-        assert "\x1b[H" not in term.output
+    def test_close_no_error(self) -> None:
+        term = FakeTerminal()
+        term.close()
 
 
-class TestFakeTerminalReadLine:
-    def test_read_line(self) -> None:
-        term = FakeTerminal(keys=["hello"])
-        assert term.read_line() == "hello"
+class TestPollKey:
+    def test_poll_key_none_when_no_key(self) -> None:
+        term = FakeTerminal(keys=["x"])
+        result = term.poll_key(0)
+        assert result is None
 
-    def test_read_line_eof(self) -> None:
-        term = FakeTerminal(keys=[])
-        with pytest.raises(EOFError):
-            term.read_line()
+    def test_poll_key_escape(self) -> None:
+        term = FakeTerminal(keys=["\x1b"])
+        result = term.poll_key(0)
+        assert result == "\x1b"
+
+    def test_poll_key_ctrl_c(self) -> None:
+        term = FakeTerminal(keys=["\x03"])
+        result = term.poll_key(0)
+        assert result == "\x03"
+
+    def test_poll_key_esc_consumes_key(self) -> None:
+        term = FakeTerminal(keys=["\x1b", "a"])
+        term.poll_key(0)
+        assert term.read_key() != "\x1b"

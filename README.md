@@ -1,139 +1,154 @@
 # AIDoor
 
-**AIDoor** is an ANSI-based BBS door that gives users access to local and remote language models. Built for Mystic BBS on Linux, with an architecture that avoids direct framework dependencies.
+A terminal-based BBS door for local AI chat via Ollama.
 
-## Status: M0.1 — Polish Release
+## Status
 
-M0.1 improves terminal rendering robustness with centralized box drawing, Unicode/CP437 character set support, and stronger ANSI safety. No AI or network code.
+**M1 Local Ollama Chat** — v0.2.0
 
-### M0 features
+Chat with local LLMs through a BBS terminal interface. Supports streaming
+responses, conversation history, model switching, and slash commands.
 
-- DOOR32.SYS drop-file parser with validation
-- Normalized user session model
-- ANSI terminal abstraction (supports ANSI on/off, raw-mode key reading)
-- TOML configuration via `tomllib`
-- Structured logging to stderr or file
-- Local test mode for development without Mystic
-- Splash, Main Menu, About, Session Info, and Goodbye screens
-- Graceful Ctrl+C, EOF, and error handling
-- Centralized box drawing with ANSI cursor positioning (no off-by-one border errors)
-- Unicode and CP437 character set support
-- Narrow terminal detection and friendly error
+## Features
 
-### What M0 does NOT include
+- Launch from Mystic via DOOR32 or run locally for testing
+- ANSI terminal UI with CP437/Unicode box drawing
+- Chat with any Ollama model installed on your server
+- Streaming responses — see text as it's generated
+- Slash commands: `/help`, `/clear`, `/model`, `/model list`, `/model select`, `/quit`
+- Cancel generation with ESC or Ctrl+C
+- Conversation history maintained during session
+- Model selection on first launch
+- Clean exit back to BBS
 
-- No AI provider (Ollama, OpenAI, etc.)
-- No HTTP or network code
-- No database or persistence
-- No chat functionality
-- No user profiles
-- No quotas or access control
+## Installation
 
-## Requirements
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and a running
+[Ollama](https://ollama.com) server.
 
-- Python 3.11 or later
-- `uv` (recommended) or `pip`
-
-## Quick start
+### Install Ollama
 
 ```bash
-# Install uv (if needed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -fsSL https://ollama.com/install.sh | sh
+```
 
-# Clone and enter the repo
-git clone https://github.com/your-org/aidoor.git
+### Pull a model
+
+```bash
+ollama pull llama3.1
+```
+
+### Install AIDoor
+
+```bash
+git clone <repo>
 cd aidoor
-
-# Sync environment
-uv sync --all-groups
-
-# Run in local test mode
-uv run aidoor --local
+uv sync
 ```
 
 ## Usage
 
+### Start Ollama (if not already running)
+
 ```bash
-# Local test mode
-uv run aidoor --local
-
-# With a DOOR32.SYS drop file
-uv run aidoor --door32 /path/to/DOOR32.SYS
-
-# With explicit config
-uv run aidoor --config /path/to/aidoor.toml --door32 /path/to/DOOR32.SYS
-
-# Version
-uv run aidoor --version
-
-# Help
-uv run aidoor --help
+ollama serve
 ```
+
+### Local test mode
+
+```bash
+uv run aidoor --local
+```
+
+Select **Chat** from the main menu to start chatting.
+
+### Mystic door mode
+
+Configure your BBS to run:
+
+```bash
+uv run aidoor --door32 /path/to/DOOR32.SYS
+```
+
+### Example chat session
+
+```
+╔══════════════════════════════════════════════╗
+║              A I D o o r                     ║
+║           Local AI Chat                      ║
+╚══════════════════════════════════════════════╝
+
+  Provider : Ollama
+  Model    : llama3.1
+  Status   : LOCAL
+
+  You> What is the capital of France?
+
+  AI> The capital of France is Paris.
+
+  You> /quit
+```
+
+### Slash commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/clear` | Clear conversation history |
+| `/model` | Show current model |
+| `/model list` | List installed models |
+| `/model select` | Change model |
+| `/quit` | Return to main menu |
+
+### Configuration
+
+Optional TOML config file:
+
+```toml
+[general]
+log_level = "INFO"
+log_file = "/var/log/aidoor.log"
+ansi = true
+
+[terminal]
+width = 80
+height = 24
+
+[ollama]
+enabled = true
+host = "http://localhost:11434"
+model = "llama3.1"
+timeout = 120
+```
+
+Pass with `--config /path/to/config.toml`.
+
+## Mystic Setup
+
+1. Install Python 3.11+ and uv on your BBS system.
+2. Copy the project to your Mystic door directory.
+3. Create a door in Mystic pointing to `uv run aidoor --door32 %DROP%`.
+4. The `%DROP%` variable will resolve to the DOOR32.SYS path.
 
 ## Development
 
 ```bash
-# Sync all dev dependencies
-uv sync --all-groups
-
-# Lint and format
+uv sync --group dev
 uv run ruff check .
-uv run ruff format --check .
-
-# Type checking
 uv run mypy src
-
-# Tests
 uv run pytest
-
-# Build
 uv build
 ```
 
-## Mystic BBS setup
+## Known Limitations
 
-See [docs/installation.md](docs/installation.md) for detailed Mystic configuration.
-
-**Important**: AI chat functionality is not available in M0. Do not deploy M0 expecting it to function as a chat door.
-
-## Project structure
-
-```
-aidoor/
-├── assets/ansi/        # ANSI art assets with built-in fallback
-├── config/             # Example configuration
-├── docs/               # Architecture, installation, roadmap
-├── scripts/            # Install and run helpers
-├── src/aidoor/         # Python package
-├── tests/              # pytest suite with fixtures
-├── pyproject.toml      # Project metadata and tool config
-└── ...
-```
-
-## Roadmap
-
-| Milestone | Focus |
-|-----------|-------|
-| M0        | Door skeleton (this release) |
-| M1        | Local Ollama-compatible chat |
-| M2        | Provider abstraction + OpenAI API |
-| M3        | Quotas, security levels, access control |
-| M4        | Profiles and local knowledge base |
-| M5        | History and deeper BBS integration |
-
-## Logging
-
-- Production use should configure `log_file` in `aidoor.toml` to capture routine INFO/DEBUG logs.
-- Without a `log_file`, routine INFO and DEBUG messages are suppressed during interactive sessions to prevent log lines from corrupting the ANSI terminal display.
-- Startup configuration errors and CLI-level failures are always reported on stderr, regardless of log configuration.
-- Expected interactive errors (e.g., drop-file parse failures) are shown through the terminal UI, not as raw log output.
-
-## Security
-
-- All dynamic text (usernames, BBS names) is sanitized before display to prevent ANSI injection.
-- Terminal state is always restored on exit, error, or interrupt.
-- Drop-file parsing uses controlled conversion — no raw `IndexError` or `ValueError` exposed to callers.
-- Future versions will add quotas, access control, and encrypted provider configuration.
+- Ollama only — no OpenAI, Anthropic, Gemini, or other providers
+- No provider abstraction layer
+- No conversation persistence (history is lost on exit)
+- Synchronous I/O — no asyncio
+- No RAG, embeddings, tools, or function calling
+- No image generation or vision support
+- No built-in ANSI editor or gallery
 
 ## License
 
