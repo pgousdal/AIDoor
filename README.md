@@ -4,7 +4,7 @@ A terminal-based BBS door for local AI chat via Ollama.
 
 ## Status
 
-**M1 Local Ollama Chat** — v0.2.0
+**M1 Local Ollama Chat** — v0.2.1
 
 Chat with local LLMs through a BBS terminal interface. Supports streaming
 responses, conversation history, model switching, and slash commands.
@@ -20,6 +20,7 @@ responses, conversation history, model switching, and slash commands.
 - Conversation history maintained during session
 - Model selection on first launch
 - Clean exit back to BBS
+- Diagnostic commands: `doctor`, `models`, `version`
 
 ## Installation
 
@@ -46,6 +47,12 @@ cd aidoor
 uv sync
 ```
 
+### Verify Installation
+
+```bash
+uv run aidoor doctor
+```
+
 ## Usage
 
 ### Start Ollama (if not already running)
@@ -57,17 +64,28 @@ ollama serve
 ### Local test mode
 
 ```bash
-uv run aidoor --local
+uv run aidoor run --local
 ```
-
-Select **Chat** from the main menu to start chatting.
 
 ### Mystic door mode
 
 Configure your BBS to run:
 
 ```bash
-uv run aidoor --door32 /path/to/DOOR32.SYS
+uv run aidoor run --door32 /path/to/DOOR32.SYS
+```
+
+### Diagnostic commands
+
+```bash
+# Check system health
+uv run aidoor doctor
+
+# List installed Ollama models
+uv run aidoor models
+
+# Show version information
+uv run aidoor version
 ```
 
 ### Example chat session
@@ -127,8 +145,10 @@ Pass with `--config /path/to/config.toml`.
 
 1. Install Python 3.11+ and uv on your BBS system.
 2. Copy the project to your Mystic door directory.
-3. Create a door in Mystic pointing to `uv run aidoor --door32 %DROP%`.
+3. Create a door in Mystic pointing to `uv run aidoor run --door32 %DROP%`.
 4. The `%DROP%` variable will resolve to the DOOR32.SYS path.
+
+See [docs/mystic.md](docs/mystic.md) for detailed Mystic integration instructions.
 
 ## Development
 

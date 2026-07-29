@@ -1,0 +1,30 @@
+# AIDoor configuration file
+# Copy to /etc/aidoor/config.toml or pass with --config
+
+[general]
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = "INFO"
+# Path to log file (empty = stderr only)
+log_file = "/var/log/aidoor.log"
+# Enable ANSI escape sequences
+ansi = true
+# Character set: "unicode" or "cp437"
+charset = "unicode"
+
+[terminal]
+# Terminal width in columns (40-999)
+width = 80
+# Terminal height in rows (10-200)
+height = 24
+# Show "more" prompt on long output
+more_prompt = true
+
+[ollama]
+# Enable Ollama integration
+enabled = true
+# Ollama server URL
+host = "http://localhost:11434"
+# Default model for chat
+model = "llama3.1"
+# HTTP request timeout in seconds (1-600)
+timeout = 120

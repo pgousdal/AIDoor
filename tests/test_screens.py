@@ -79,7 +79,7 @@ class TestAbout:
         show_about(term, session)
         output = term.output
         assert "AIDoor" in output
-        assert "0.2.0" in output
+        assert "0.2.1" in output
         assert "M1" in output
         assert "MIT" in output
         assert "Ollama" in output

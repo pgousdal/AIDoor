@@ -1,130 +1,121 @@
-# Installation and Mystic BBS setup
+# Installation
 
-## Prerequisites
+## Requirements
 
-- Linux server running Mystic BBS v1.12 or later
-- Python 3.11 or later installed on the BBS server
-- `uv` (recommended) or `pip`
+- **Python** 3.11 or later
+- **uv** package manager (recommended) or pip
+- **Ollama** server (local or network)
 
-## 1. Install AIDoor
+## Linux Install
 
-### Option A: Using uv (recommended)
-
-```bash
-git clone https://github.com/your-org/aidoor.git /path/to/aidoor
-cd /path/to/aidoor
-uv sync --all-groups
-```
-
-### Option B: Using pip
+### 1. Install Python
 
 ```bash
-git clone https://github.com/your-org/aidoor.git /path/to/aidoor
-cd /path/to/aidoor
-python3 -m venv .venv
-source .venv/bin/activate
-pip install .
+# Debian/Ubuntu
+sudo apt update
+sudo apt install python3 python3-venv python3-pip
+
+# RHEL/CentOS/Fedora
+sudo dnf install python3 python3-venv python3-pip
+
+# Arch
+sudo pacman -S python python-pip
 ```
 
-## 2. Configure AIDoor
-
-Copy the example configuration:
+### 2. Install uv
 
 ```bash
-cp /path/to/aidoor/config/aidoor.example.toml /path/to/aidoor/config/aidoor.toml
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Edit `aidoor.toml` as needed. At minimum, set `log_file` to a writable path if you want file logging instead of stderr.
-
-## 3. Mystic BBS configuration
-
-### Create the door in Mystic
-
-1. Open Mystic Config (usually by typing `CONFIG` at the Mystic prompt, or `cd /path/to/mystic && ./mystic -c`).
-2. Navigate to **External Programs** (menu option 4, then 1).
-3. Add a new door program with these recommended settings:
-
-| Field | Value |
-|-------|-------|
-| Program Name | `AIDoor` |
-| Internal Code | `AIDOOR` |
-| Command Line | `/path/to/aidoor/.venv/bin/aidoor --config /path/to/aidoor/config/aidoor.toml --door32 "%PDOOR32.SYS"` |
-| Working Directory | `/path/to/aidoor` |
-| Drop File Type | `DOOR32` |
-| Access Requirements | Set as appropriate for your board |
-| Start Page | None |
-
-> **Important**: Verify the exact `%PDOOR32.SYS` variable name in your Mystic version. Some versions use `%DOOR32.SYS` or `%pdoor32.sys`. Check Mystic's door documentation or menu editor for the correct variable.
-
-### Node temporary path
-
-Mystic creates drop files in each node's temporary path. Ensure the node temp path exists and is writable by the Mystic process.
-
-Typical location: `/path/to/mystic/temp/node1/`
-
-The `%PDOOR32.SYS` variable expands to the full path of `DOOR32.SYS` in the node's temp directory.
-
-### File permissions
-
-The Mystic process and the Python interpreter must both be able to read:
-- The AIDoor installation directory
-- The `aidoor.toml` config file
-- The Python virtual environment
-- The log file directory (if file logging is configured)
-
-Ensure the Mystic system user (often the same user running Mystic) has appropriate permissions:
+Restart your shell or run:
 
 ```bash
-chmod +x /path/to/aidoor/.venv/bin/aidoor
+source ~/.bashrc
 ```
 
-### Logging
-
-If `log_file` is set in `aidoor.toml`, ensure the log directory is writable. Example:
-
-```toml
-[general]
-log_file = "/var/log/aidoor/aidoor.log"
-```
+### 3. Install Ollama
 
 ```bash
-mkdir -p /var/log/aidoor
-chown mysticuser:mysticgroup /var/log/aidoor
+curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-If `log_file` is empty, logs are written to stderr, which Mystic may capture or discard depending on its configuration.
-
-## 4. Test locally before activating
-
-Before configuring the door in Mystic, test locally on the server:
+### 4. Pull a model
 
 ```bash
-cd /path/to/aidoor
-uv run aidoor --local
+ollama pull llama3.1
 ```
 
-This starts AIDoor in test mode with dummy session data. Verify that:
-- The splash screen displays
-- Menu options work (1=About, 2=Session Info, Q=Quit)
-- The goodbye screen appears before exit
-
-Then test with an actual DOOR32.SYS if you have one:
+### 5. Download AIDoor
 
 ```bash
-uv run aidoor --door32 /path/to/DOOR32.SYS
+git clone https://github.com/your-org/aidoor.git
+cd aidoor
+uv sync
 ```
 
-## 5. Activate in Mystic
+### 6. Verify Installation
 
-After testing, activate the door in Mystic's External Program menu. Place the door in a menu or make it accessible through your BBS's door list.
+```bash
+uv run aidoor doctor
+```
 
-## 6. Troubleshooting
+If everything is configured correctly, you should see:
 
-| Problem | Likely cause |
-|---------|-------------|
-| Door exits immediately | Drop file path incorrect; test with `--door32` manually |
-| "Drop file not found" | `%PDOOR32.SYS` variable not resolving; check Mystic version |
-| "Unsupported communication type" | BBS is not using stdin/stdout mode for the door |
-| Permission denied | Python or virtual environment not accessible by Mystic user |
-| Log file not written | Log directory not writable by Mystic user |
-| ANSI screen garbled | Terminal settings in BBS; try setting terminal to ANSI |
+```
+  ✓ package version
+      ✓ AIDoor 0.2.1
+  ✓ python version
+      ✓ Python 3.12
+  ...
+  All checks passed.
+```
+
+### 7. Start Ollama (if not running)
+
+```bash
+ollama serve
+```
+
+### 8. Run in local mode
+
+```bash
+uv run aidoor run --local
+```
+
+## Alternative: pip install
+
+If you don't have git, you can install directly from the release archive:
+
+```bash
+# Download the wheel from the releases page
+pip install aidoor-0.2.1-py3-none-any.whl
+
+# Or install from source
+pip install aidoor-0.2.1.tar.gz
+```
+
+After pip install, the `aidoor` command is available globally:
+
+```bash
+aidoor run --local
+aidoor doctor
+aidoor models
+aidoor version
+```
+
+## Configuration
+
+AIDoor works without configuration, but for custom settings:
+
+```bash
+mkdir -p /etc/aidoor
+cp examples/example-config.toml /etc/aidoor/config.toml
+# Edit the file to suit your environment
+```
+
+Pass the config file when running:
+
+```bash
+uv run aidoor run --local --config /etc/aidoor/config.toml
+```

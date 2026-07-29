@@ -2,8 +2,8 @@ from aidoor.version import __app_name__, __milepost__, __version__
 
 
 class TestVersion:
-    def test_version_is_0_2_0(self) -> None:
-        assert __version__ == "0.2.0"
+    def test_version_is_0_2_1(self) -> None:
+        assert __version__ == "0.2.1"
 
     def test_app_name(self) -> None:
         assert __app_name__ == "AIDoor"

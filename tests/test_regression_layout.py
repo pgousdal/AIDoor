@@ -181,7 +181,12 @@ class TestLoggingNotInUI:
         fd, log_path = tempfile.mkstemp(suffix=".log")
         os.close(fd)
 
+        logger = logging.getLogger("aidoor")
+        old_handlers = list(logger.handlers)
+        old_level = logger.level
+
         try:
+            logger.handlers.clear()
             setup_logging(log_level="INFO", log_file=log_path)
 
             config = AppConfig()
@@ -192,10 +197,11 @@ class TestLoggingNotInUI:
             result = run_app(door32_path=None, local=True, config=config, term=term)
             assert result == 0
 
-            # Flush/close all logging handlers so the file is written
-            for handler in logging.getLogger("aidoor").handlers[:]:
+            # Flush and close our file handler
+            for handler in logger.handlers[:]:
                 handler.flush()
                 handler.close()
+            logger.handlers.clear()
 
             with open(log_path, encoding="utf-8") as f:
                 log_content = f.read()
@@ -204,6 +210,8 @@ class TestLoggingNotInUI:
             assert "Starting" in log_content, "Startup log should be written to file"
         finally:
             os.unlink(log_path)
+            logger.handlers[:] = old_handlers
+            logger.setLevel(old_level)
 
     def test_startup_error_on_stderr(self) -> None:
         from aidoor.cli import main

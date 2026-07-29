@@ -1,6 +1,6 @@
 [project]
 name = "aidoor"
-version = "0.2.0"
+version = "0.2.1"
 description = "Terminal-based BBS door for local AI chat with Ollama"
 readme = "README.md"
 license = { text = "MIT" }
@@ -40,7 +40,15 @@ dev = [
 ]
 
 [tool.hatch.build]
-include = ["src/aidoor/**/*.py"]
+include = [
+    "src/aidoor/**/*.py",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "AGENTS.md",
+    "docs/**/*",
+    "examples/**/*",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aidoor"]

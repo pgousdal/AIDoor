@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.1 — 2026-07-28 — Deployment and Release Hardening
+
+- Added `aidoor doctor` CLI command for system diagnostics
+- Added `aidoor models` CLI command to list installed Ollama models
+- Added `aidoor version` CLI command showing version, Python, platform, and Ollama info
+- Changed CLI to subcommand-based structure (`aidoor run`, `aidoor doctor`, etc.)
+- Improved configuration validation with friendly error messages
+- Added release assets: example config, Mystic/launcher scripts, systemd service example
+- Added documentation: installation guide, Mystic integration, troubleshooting
+- Updated package build to include docs/ and examples/ in source distribution
+- Added comprehensive tests for doctor, models, and version commands
+- Version 0.2.0 → 0.2.1
+
+## 0.2.0 — 2026-07-28 — M1 Local Ollama Chat
+
+- Implemented Ollama HTTP client with streaming support
+- Added interactive chat loop with conversation history
+- Added slash commands: /help, /clear, /model, /model list, /model select, /quit
+- Added StreamRenderer with word-wrapping and ESC/Ctrl+C cancellation
+- Added model selection UI for multi-model environments
+- Integrated Ollama into main menu and about screen
+- Added ChatSession with message history management
+- All HTTP details hidden inside OllamaClient
+- Synchronous I/O throughout
+- Package version updated to 0.2.0
+
 ## 0.1.2 — 2026-07-28 — Terminal Layout Bugfix
 
 - Fixed splash-screen box/content overlap — explicit cursor positioning between absolute box drawing and sequential info block output
