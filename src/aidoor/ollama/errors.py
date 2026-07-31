@@ -1,23 +1,28 @@
 from __future__ import annotations
 
-from aidoor.errors import AIDoorError
+from aidoor.providers.errors import (
+    ProviderError,
+    ProviderModelNotFoundError,
+    ProviderResponseError,
+    ProviderUnavailable,
+)
 
 
-class OllamaError(AIDoorError):
+class OllamaError(ProviderError):
     pass
 
 
-class OllamaConnectionError(OllamaError):
+class OllamaConnectionError(ProviderUnavailable):
     pass
 
 
-class OllamaTimeoutError(OllamaError):
+class OllamaTimeoutError(ProviderUnavailable):
     pass
 
 
-class OllamaModelNotFoundError(OllamaError):
+class OllamaModelNotFoundError(ProviderModelNotFoundError):
     pass
 
 
-class OllamaInvalidResponseError(OllamaError):
+class OllamaInvalidResponseError(ProviderResponseError):
     pass

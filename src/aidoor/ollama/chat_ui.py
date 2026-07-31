@@ -3,16 +3,15 @@ from __future__ import annotations
 import logging
 
 from aidoor.ollama.chat_session import ChatSession
-from aidoor.ollama.client import OllamaClient
-from aidoor.ollama.errors import (
-    OllamaConnectionError,
-    OllamaError,
-    OllamaInvalidResponseError,
-    OllamaModelNotFoundError,
-    OllamaTimeoutError,
-)
-from aidoor.ollama.models import ModelInfo, ModelSelectionResult
 from aidoor.ollama.stream_renderer import StreamRenderer
+from aidoor.providers import (
+    ModelInfo,
+    ModelSelectionResult,
+    Provider,
+    ProviderModelNotFoundError,
+    ProviderResponseError,
+    ProviderUnavailable,
+)
 from aidoor.terminal import Terminal
 
 logger = logging.getLogger("aidoor")
@@ -83,7 +82,7 @@ def show_model_selection(
             pass
 
 
-def _show_header(term: Terminal, model_name: str) -> None:
+def _show_header(term: Terminal, model_name: str, provider: Provider) -> None:
     bw = 42
     header_lines = [
         "\u2554" + "\u2550" * (bw - 2) + "\u2557",
@@ -93,7 +92,7 @@ def _show_header(term: Terminal, model_name: str) -> None:
         "\u255a" + "\u2550" * (bw - 2) + "\u255d",
     ]
     info_lines = [
-        "  Provider : Ollama",
+        f"  Provider : {provider.provider_name()}",
         f"  Model    : {model_name}",
         "  Status   : LOCAL",
     ]
@@ -132,12 +131,12 @@ def _confirm(term: Terminal, prompt: str) -> bool:
 
 def chat_loop(
     term: Terminal,
-    client: OllamaClient,
+    provider: Provider,
     config_model: str,
 ) -> None:
     try:
-        models = client.list_models()
-    except (OllamaConnectionError, OllamaError):
+        models = provider.list_models()
+    except ProviderUnavailable:
         term.write(
             "\r\n  Ollama server not available.\r\n"
             "  Please start Ollama and try again.\r\n"
@@ -168,7 +167,7 @@ def chat_loop(
     assert result.model is not None
     selected_model = result.model
     session = ChatSession(model=selected_model)
-    _show_header(term, selected_model)
+    _show_header(term, selected_model, provider)
     term.writeln()
 
     while True:
@@ -258,7 +257,7 @@ def chat_loop(
         term.flush()
 
         try:
-            stream = client.chat_stream(
+            stream = provider.chat_stream(
                 model=session.model,
                 messages=session.to_api_format(),
             )
@@ -267,19 +266,19 @@ def chat_loop(
             session.add_assistant_message(
                 _strip_cancel_suffix(response)
             )
-        except OllamaModelNotFoundError:
+        except ProviderModelNotFoundError:
             term.write(
                 f"\r\n  Model '{session.model}' not found on server.\r\n"
             )
             term.flush()
             session._messages.pop()
             continue
-        except (OllamaConnectionError, OllamaTimeoutError) as exc:
+        except (ProviderUnavailable) as exc:
             term.write(f"\r\n  Connection error: {exc}\r\n")
             term.flush()
             session._messages.pop()
             continue
-        except OllamaInvalidResponseError:
+        except ProviderResponseError:
             term.write(
                 "\r\n  Invalid response from Ollama.\r\n"
             )

@@ -5,8 +5,12 @@ import sys
 from pathlib import Path
 
 from aidoor.config import AppConfig, parse_config
-from aidoor.ollama.client import OllamaClient
-from aidoor.ollama.errors import OllamaConnectionError, OllamaError
+from aidoor.providers import (
+    Provider,
+    ProviderError,
+    ProviderUnavailable,
+    create_provider,
+)
 from aidoor.version import __version__
 
 
@@ -96,34 +100,41 @@ def check_log_file(result: CheckResult, config: AppConfig | None) -> None:
         result.fail(f"Log file check failed: {exc}")
 
 
-def check_ollama_reachable(result: CheckResult, config: AppConfig | None) -> None:
-    if config is None:
+def check_provider(result: CheckResult, provider: Provider | None) -> None:
+    if provider is None:
+        result.warn("Cannot check provider — none configured")
+        return
+    name = provider.provider_name()
+    result.messages.append(f"Provider: {name}")
+
+
+def check_ollama_reachable(result: CheckResult, provider: Provider | None) -> None:
+    if provider is None:
         result.warn("Cannot check Ollama without configuration")
         return
-    host = config.ollama.host
-    timeout = config.ollama.timeout
-    client = OllamaClient(host=host, timeout=timeout)
     try:
-        ok = client.health()
+        ok = provider.health()
     except Exception:
         ok = False
     if ok:
-        result.messages.append(f"Ollama reachable at {host}")
+        host = getattr(provider, "_client", None)
+        host_str = getattr(host, "_host", "unknown") if host else "unknown"
+        result.messages.append(f"Ollama reachable at {host_str}")
     else:
-        result.fail(f"Cannot connect to Ollama at {host}")
+        result.messages.append("Ollama not reachable")
+        result.fail("Cannot connect to Ollama")
 
 
-def check_model_installed(result: CheckResult, config: AppConfig | None) -> None:
-    if config is None:
+def check_model_installed(
+    result: CheckResult, provider: Provider | None, config: AppConfig | None
+) -> None:
+    if provider is None or config is None:
         result.warn("Cannot check model without configuration")
         return
     model = config.ollama.model
-    host = config.ollama.host
-    timeout = config.ollama.timeout
-    client = OllamaClient(host=host, timeout=timeout)
     try:
-        models = client.list_models()
-    except (OllamaConnectionError, OllamaError):
+        models = provider.list_models()
+    except (ProviderUnavailable, ProviderError):
         result.warn("Cannot list models — Ollama unreachable")
         return
     model_names = {m.name.lower() for m in models}
@@ -158,6 +169,17 @@ def run_checks(config_path: str | None) -> list[CheckResult]:
     config = check_configuration(r, config_path)
     checks.append(r)
 
+    provider: Provider | None = None
+    if config is not None:
+        try:
+            provider = create_provider(config)
+        except Exception:
+            provider = None
+
+    r = CheckResult("provider")
+    check_provider(r, provider)
+    checks.append(r)
+
     r = CheckResult("ollama URL")
     check_ollama_host(r, config)
     checks.append(r)
@@ -171,11 +193,11 @@ def run_checks(config_path: str | None) -> list[CheckResult]:
     checks.append(r)
 
     r = CheckResult("ollama reachable")
-    check_ollama_reachable(r, config)
+    check_ollama_reachable(r, provider)
     checks.append(r)
 
     r = CheckResult("model installed")
-    check_model_installed(r, config)
+    check_model_installed(r, provider, config)
     checks.append(r)
 
     return checks

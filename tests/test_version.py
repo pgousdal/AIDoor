@@ -9,4 +9,4 @@ class TestVersion:
         assert __app_name__ == "AIDoor"
 
     def test_milepost(self) -> None:
-        assert __milepost__ == "M1 Local Ollama Chat"
+        assert __milepost__ == "M2 Provider Architecture"

@@ -11,7 +11,7 @@ from aidoor.ollama.errors import (
     OllamaInvalidResponseError,
     OllamaModelNotFoundError,
 )
-from aidoor.ollama.models import ModelInfo
+from aidoor.providers.models import ModelInfo
 
 
 def _mock_response(data: object, status: int = 200) -> MagicMock:

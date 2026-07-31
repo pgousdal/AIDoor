@@ -10,8 +10,12 @@ from aidoor.config import parse_config
 from aidoor.doctor.checks import doctor_main
 from aidoor.errors import AIDoorError, ConfigurationError, DropFileError
 from aidoor.logging_config import setup_logging
-from aidoor.ollama.client import OllamaClient
-from aidoor.ollama.errors import OllamaConnectionError, OllamaError
+from aidoor.providers import (
+    ProviderConfigurationError,
+    ProviderError,
+    ProviderUnavailable,
+    create_provider,
+)
 from aidoor.version import __app_name__, __version__
 
 logger = logging.getLogger("aidoor")
@@ -101,10 +105,13 @@ def _cmd_models(config_path: str | None) -> int:
         print(_format_error(str(exc)), file=sys.stderr)
         return 1
 
-    client = OllamaClient(host=config.ollama.host, timeout=config.ollama.timeout)
     try:
-        models = client.list_models()
-    except (OllamaConnectionError, OllamaError) as exc:
+        provider = create_provider(config)
+        models = provider.list_models()
+    except (ProviderUnavailable, ProviderError) as exc:
+        print(_format_error(str(exc)), file=sys.stderr)
+        return 1
+    except ProviderConfigurationError as exc:
         print(_format_error(str(exc)), file=sys.stderr)
         return 1
 
@@ -125,12 +132,14 @@ def _cmd_version(config_path: str | None) -> int:
 
     try:
         config = parse_config(config_path)
-        client = OllamaClient(host=config.ollama.host, timeout=config.ollama.timeout)
-        if client.health():
+        provider = create_provider(config)
+        print(f"Provider        : {provider.provider_name()}")
+        if provider.health():
             print("Ollama version  : available")
         else:
             print("Ollama version  : unavailable")
     except Exception:
+        print("Provider        : Ollama")
         print("Ollama version  : unavailable")
 
     return 0

@@ -72,9 +72,23 @@ class OllamaConfig:
 
 
 @dataclasses.dataclass
+class ProviderConfig:
+    type: str = "ollama"
+
+    def __post_init__(self) -> None:
+        valid = {"ollama"}
+        if self.type.lower() not in valid:
+            raise ConfigurationError(
+                f"Invalid provider type: {self.type!r}. "
+                f"Must be one of {', '.join(sorted(valid))}"
+            )
+
+
+@dataclasses.dataclass
 class AppConfig:
     general: GeneralConfig = dataclasses.field(default_factory=GeneralConfig)
     terminal: TerminalConfig = dataclasses.field(default_factory=TerminalConfig)
+    provider: ProviderConfig = dataclasses.field(default_factory=ProviderConfig)
     ollama: OllamaConfig = dataclasses.field(default_factory=OllamaConfig)
 
 
@@ -94,11 +108,13 @@ def parse_config(config_path: str | None) -> AppConfig:
 
     general_raw = _filter_known(data.get("general", {}), GeneralConfig)
     terminal_raw = _filter_known(data.get("terminal", {}), TerminalConfig)
+    provider_raw = _filter_known(data.get("provider", {}), ProviderConfig)
     ollama_raw = _filter_known(data.get("ollama", {}), OllamaConfig)
 
     return AppConfig(
         general=GeneralConfig(**general_raw),
         terminal=TerminalConfig(**terminal_raw),
+        provider=ProviderConfig(**provider_raw),
         ollama=OllamaConfig(**ollama_raw),
     )
 

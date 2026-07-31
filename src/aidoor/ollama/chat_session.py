@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aidoor.ollama.models import Message
+from aidoor.providers.models import Message
 
 
 class ChatSession:

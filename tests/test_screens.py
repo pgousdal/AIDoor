@@ -80,7 +80,7 @@ class TestAbout:
         output = term.output
         assert "AIDoor" in output
         assert "0.2.1" in output
-        assert "M1" in output
+        assert "M2" in output
         assert "MIT" in output
         assert "Ollama" in output
 

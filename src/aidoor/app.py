@@ -7,7 +7,7 @@ from aidoor.config import AppConfig
 from aidoor.door32 import parse_door32_file
 from aidoor.errors import AIDoorError
 from aidoor.ollama.chat_ui import chat_loop
-from aidoor.ollama.client import OllamaClient
+from aidoor.providers import create_provider
 from aidoor.screens import (
     show_about,
     show_goodbye,
@@ -100,20 +100,14 @@ def _run_interactive(
 
     show_splash(term, bbs_session, ansi_dir, charset)
 
-    if config and config.ollama.enabled:
-        ollama_client = OllamaClient(
-            host=config.ollama.host,
-            timeout=config.ollama.timeout,
-        )
-    else:
-        ollama_client = None
+    provider = create_provider(config) if config and config.ollama.enabled else None
 
     while True:
         choice = show_main_menu(term, bbs_session, charset)
 
         if choice == "1":
-            if ollama_client is not None:
-                chat_loop(term, ollama_client, config.ollama.model)
+            if provider is not None:
+                chat_loop(term, provider, config.ollama.model)
             else:
                 show_about(term, bbs_session, charset)
         elif choice == "2":

@@ -9,13 +9,16 @@ from aidoor.ollama.errors import (
     OllamaTimeoutError,
 )
 from aidoor.ollama.models import (
+    ChatResponse,
     Message,
     ModelInfo,
     ModelSelectionResult,
+    VersionInfo,
 )
 from aidoor.ollama.stream_renderer import StreamRenderer
 
 __all__ = [
+    "ChatResponse",
     "ChatSession",
     "Message",
     "ModelInfo",
@@ -27,5 +30,6 @@ __all__ = [
     "OllamaModelNotFoundError",
     "OllamaTimeoutError",
     "StreamRenderer",
+    "VersionInfo",
     "chat_loop",
 ]

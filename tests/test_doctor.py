@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from aidoor.config import AppConfig
 from aidoor.doctor.checks import (
     CheckResult,
     check_configuration,
@@ -15,25 +16,29 @@ from aidoor.doctor.checks import (
     check_ollama_host,
     check_ollama_reachable,
     check_package_version,
+    check_provider,
     check_python_version,
     check_terminal,
     doctor_main,
     print_report,
     run_checks,
 )
-from aidoor.ollama.errors import OllamaConnectionError
+from aidoor.providers import Provider, ProviderUnavailable
+from aidoor.providers.models import ModelInfo
 
 
 def _result() -> CheckResult:
     return CheckResult("test")
 
 
-def _mock_response(data: object) -> MagicMock:
+def _mock_tags_response(names: list[str]) -> MagicMock:
+    data = {"models": [{"name": n, "modified_at": "", "size": 0} for n in names]}
     body = json.dumps(data).encode("utf-8")
     resp = MagicMock()
     resp.__enter__.return_value = resp
     resp.read.return_value = body
     return resp
+    return CheckResult("test")
 
 
 class TestCheckPythonVersion:
@@ -69,18 +74,29 @@ class TestCheckConfiguration:
         assert config is None
 
 
+class TestCheckProvider:
+    def test_shows_provider_name(self) -> None:
+        r = _result()
+        provider = MagicMock(spec=Provider)
+        provider.provider_name.return_value = "Ollama"
+        check_provider(r, provider)
+        assert r.passed
+        assert any("Ollama" in m for m in r.messages)
+
+    def test_warns_on_no_provider(self) -> None:
+        r = _result()
+        check_provider(r, None)
+        assert r.warnings
+
+
 class TestCheckTerminal:
     def test_passes_with_defaults(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         check_terminal(r, AppConfig())
         assert r.passed
 
     def test_fails_on_narrow(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         config = AppConfig()
         config.terminal.width = 30
         check_terminal(r, config)
@@ -88,7 +104,7 @@ class TestCheckTerminal:
 
     def test_warns_on_below_recommended(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig, TerminalConfig
+        from aidoor.config import TerminalConfig
 
         config = AppConfig(terminal=TerminalConfig(width=50, height=24))
         check_terminal(r, config)
@@ -97,8 +113,6 @@ class TestCheckTerminal:
 
     def test_fails_on_short(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         config = AppConfig()
         config.terminal.height = 5
         check_terminal(r, config)
@@ -108,15 +122,11 @@ class TestCheckTerminal:
 class TestCheckLogFile:
     def test_passes_when_not_configured(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         check_log_file(r, AppConfig())
         assert r.passed
 
     def test_passes_when_writable(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         fd, path = tempfile.mkstemp(suffix=".log")
         os.close(fd)
         try:
@@ -129,8 +139,6 @@ class TestCheckLogFile:
 
     def test_fails_on_unwritable_dir(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         config = AppConfig()
         config.general.log_file = "/nonexistent/deep/aidoor.log"
         check_log_file(r, config)
@@ -145,8 +153,6 @@ class TestCheckLogFile:
 class TestCheckOllamaHost:
     def test_passes_with_valid(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         check_ollama_host(r, AppConfig())
         assert r.passed
 
@@ -157,8 +163,6 @@ class TestCheckOllamaHost:
 
     def test_fails_on_bad_url(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
         config = AppConfig()
         config.ollama.host = "localhost:11434"
         check_ollama_host(r, config)
@@ -168,21 +172,19 @@ class TestCheckOllamaHost:
 class TestCheckOllamaReachable:
     def test_passes_when_healthy(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
-        with patch("urllib.request.urlopen", return_value=_mock_response({"version": "0.1.0"})):
-            check_ollama_reachable(r, AppConfig())
+        provider = MagicMock(spec=Provider)
+        provider.health.return_value = True
+        check_ollama_reachable(r, provider)
         assert r.passed
 
     def test_fails_when_unreachable(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
-        with patch("urllib.request.urlopen", side_effect=ConnectionError):
-            check_ollama_reachable(r, AppConfig())
+        provider = MagicMock(spec=Provider)
+        provider.health.return_value = False
+        check_ollama_reachable(r, provider)
         assert not r.passed
 
-    def test_warns_without_config(self) -> None:
+    def test_warns_without_provider(self) -> None:
         r = _result()
         check_ollama_reachable(r, None)
         assert r.warnings
@@ -191,71 +193,52 @@ class TestCheckOllamaReachable:
 class TestCheckModelInstalled:
     def test_passes_when_found(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
-        data = {"models": [{"name": "llama3.1", "modified_at": "", "size": 0}]}
-        with patch("urllib.request.urlopen", return_value=_mock_response(data)):
-            check_model_installed(r, AppConfig())
+        provider = MagicMock(spec=Provider)
+        provider.list_models.return_value = [
+            ModelInfo(name="llama3.1", modified_at="", size=0)
+        ]
+        check_model_installed(r, provider, AppConfig())
         assert r.passed
 
     def test_fails_when_not_found(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig, OllamaConfig
-
-        config = AppConfig(ollama=OllamaConfig(model="nonexistent"))
-        data = {"models": [{"name": "llama3.1", "modified_at": "", "size": 0}]}
-        with patch("urllib.request.urlopen", return_value=_mock_response(data)):
-            check_model_installed(r, config)
+        provider = MagicMock(spec=Provider)
+        provider.list_models.return_value = [
+            ModelInfo(name="mistral", modified_at="", size=0)
+        ]
+        config = AppConfig()
+        config.ollama.model = "nonexistent"
+        check_model_installed(r, provider, config)
         assert not r.passed
 
     def test_warns_on_unreachable(self) -> None:
         r = _result()
-        from aidoor.config import AppConfig
-
-        with patch("urllib.request.urlopen", side_effect=OllamaConnectionError("fail")):
-            check_model_installed(r, AppConfig())
+        provider = MagicMock(spec=Provider)
+        provider.list_models.side_effect = ProviderUnavailable("fail")
+        check_model_installed(r, provider, AppConfig())
         assert r.warnings
-
-
-def _ollama_side_effect(*args: object, **kwargs: object) -> MagicMock:
-    for a in args:
-        if hasattr(a, "full_url"):
-            url = a.full_url  # type: ignore[union-attr]
-            if "/api/tags" in url:
-                tag_data = {"models": [{"name": "llama3.1", "modified_at": "", "size": 0}]}
-                return _mock_response(tag_data)
-            if "/api/" in url:
-                return _mock_response({"version": "0.1.0"})
-    return _mock_response({"version": "0.1.0"})
 
 
 class TestRunChecks:
     def test_returns_list(self) -> None:
-        with patch("urllib.request.urlopen", side_effect=_ollama_side_effect):
-            checks = run_checks(None)
-        assert len(checks) >= 6
+        checks = run_checks(None)
+        assert len(checks) >= 7
 
     def test_each_has_name(self) -> None:
-        with patch("urllib.request.urlopen", side_effect=_ollama_side_effect):
-            checks = run_checks(None)
+        checks = run_checks(None)
         for c in checks:
             assert c.name
 
-    def test_ollama_checks_with_mock(self) -> None:
-        with patch("urllib.request.urlopen", side_effect=_ollama_side_effect):
-            checks = run_checks(None)
-            ollama_checks = [
-                c for c in checks
-                if "ollama" in c.name.lower() or "model" in c.name.lower()
-            ]
-            assert len(ollama_checks) >= 2
+    def test_provider_check_present(self) -> None:
+        checks = run_checks(None)
+        provider_checks = [c for c in checks if "provider" in c.name.lower()]
+        assert len(provider_checks) >= 1
 
 
 class TestPrintReport:
-    def test_returns_zero_on_success(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with patch("urllib.request.urlopen", side_effect=_ollama_side_effect):
-            checks = run_checks(None)
-            score = print_report(checks)
+    def test_returns_zero_on_defaults(self, capsys: pytest.CaptureFixture[str]) -> None:
+        checks = run_checks(None)
+        score = print_report(checks)
         assert score >= 0
         captured = capsys.readouterr()
         assert "AIDoor Doctor" in captured.out
@@ -263,9 +246,16 @@ class TestPrintReport:
 
 class TestDoctorMain:
     def test_returns_0_on_no_errors(self) -> None:
-        with patch("urllib.request.urlopen", side_effect=_ollama_side_effect):
+        with patch("urllib.request.urlopen") as mock:
+            mock_response = MagicMock()
+            mock_response.__enter__.return_value = mock_response
+            mock_response.read.return_value = b'{"version": "0.1.0"}'
+            mock.side_effect = [
+                mock_response,
+                _mock_tags_response(["llama3.1"]),
+            ]
             rc = doctor_main(None)
-            assert rc in (0, 1)
+        assert rc in (0, 1)
 
     def test_returns_2_on_config_error(self) -> None:
         rc = doctor_main("/nonexistent/config.toml")
